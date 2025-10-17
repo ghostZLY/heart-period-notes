@@ -39,6 +39,6 @@ export default {
 }
 
 .option[data-type="period"] {
-  border-left: 4px solid #f44336;
+/*  border-left: 4px solid #f44336;*/
 }
 </style>

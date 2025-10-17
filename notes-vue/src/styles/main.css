@@ -8,19 +8,24 @@
 body {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     min-height: 100vh;
-    padding: 20px;
+/*    padding: 20px;*/
 }
 
 /* 主容器布局 */
 .app-container {
     display: flex;
-    max-width: 1400px;
-    margin: 0 auto;
+    /*    max-width: 1400px;*/
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    border: none;
     background: white;
-    border-radius: 20px;
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+    /*    border-radius: 20px;*/
+/*    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);*/
     overflow: hidden;
     min-height: 800px;
+    position: relative;
 }
 
 /* 弹窗样式 */
