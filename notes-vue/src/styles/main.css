@@ -8,27 +8,23 @@
 body {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     min-height: 100vh;
-/*    padding: 20px;*/
 }
 
 /* 主容器布局 */
 .app-container {
     display: flex;
-    /*    max-width: 1400px;*/
     margin: 0;
     padding: 0;
     width: 100vw;
     height: 100vh;
     border: none;
     background: white;
-    /*    border-radius: 20px;*/
-/*    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);*/
     overflow: hidden;
     min-height: 800px;
     position: relative;
 }
 
-/* 弹窗样式 */
+/* 弹窗样式 - 确保完全不透明且在最顶层 */
 .modal {
     display: flex;
     position: fixed;
@@ -40,15 +36,93 @@ body {
     background-color: rgba(0, 0, 0, 0.5);
     align-items: center;
     justify-content: center;
+    opacity: 1 !important;
 }
 
 .modal-content {
-    background-color: white;
+    background-color: white !important;
     padding: 25px;
     border-radius: 15px;
     width: 350px;
     position: relative;
     animation: modalSlideIn 0.3s ease;
+    opacity: 1 !important;
+    z-index: 1001;
+}
+
+/* 登录弹窗样式 */
+.login-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #f4a8c9 0%, #e46f89 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000 !important;
+    opacity: 1 !important;
+}
+
+.login-container {
+    background: white !important;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 400px;
+    opacity: 1 !important;
+    z-index: 1001;
+}
+
+/* 编辑对话框 - 确保完全不透明 */
+.edit-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000 !important;
+    opacity: 1 !important;
+}
+
+.edit-dialog {
+    background: white !important;
+    border-radius: 15px;
+    padding: 30px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-height: 80vh;
+    overflow-y: auto;
+    opacity: 1 !important;
+    z-index: 1001;
+}
+
+/* 下拉菜单 - 确保完全不透明 */
+.dropdown-menu {
+    background: white !important;
+    opacity: 1 !important;
+    z-index: 1001 !important;
+}
+
+.dropdown-item {
+    background: white !important;
+    opacity: 1 !important;
+}
+
+/* 所有弹窗内部元素都保持不透明 */
+.modal *,
+.edit-dialog *,
+.dropdown-menu *,
+.login-modal *,
+.login-container * {
+    opacity: 1 !important;
 }
 
 @keyframes modalSlideIn {
@@ -72,9 +146,9 @@ body {
     color: #aaa;
 }
 
-.close:hover {
-    color: #000;
-}
+    .close:hover {
+        color: #000;
+    }
 
 .modal-content h3 {
     margin-bottom: 20px;
