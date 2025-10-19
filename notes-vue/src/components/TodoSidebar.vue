@@ -122,33 +122,70 @@
         所有事项
       </button>
       <button class="tab-button"
-              :class="{ active: activeTab === 'completed' }"
-              @click="activeTab = 'completed'">
-        tag
+              :class="{ active: activeTab === 'templates' }"
+              @click="activeTab = 'templates'">
+        tag管理
       </button>
     </div>
 
     <div class="todo-content">
-      <div class="todo-input-section">
-        <input type="text"
-               v-model="newTodoText"
-               @keyup.enter="addTodo"
-               placeholder="添加新事项...">
-        <button @click="addTodo">添加</button>
-      </div>
-      <div class="todo-list">
-        <div v-for="todo in filteredTodos"
-             :key="todo.id"
-             class="todo-item"
-             :class="{ completed: todo.completed }">
-          <input type="checkbox"
-                 :checked="todo.completed"
-                 @change="$emit('toggle-todo', todo.id)">
-          <span class="todo-text">{{ todo.text }}</span>
-          <button class="delete-todo" @click="$emit('delete-todo', todo.id)">×</button>
+      <!-- 待办事项模式 -->
+      <div v-if="activeTab !== 'templates'">
+        <div class="todo-input-section">
+          <input type="text"
+                 v-model="newTodoText"
+                 @keyup.enter="addTodo"
+                 placeholder="添加新事项...">
+          <button @click="addTodo">添加</button>
         </div>
-        <div v-if="filteredTodos.length === 0" class="empty-state">
-          {{ emptyMessage }}
+        <div class="todo-list">
+          <div v-for="todo in filteredTodos"
+               :key="todo.id"
+               class="todo-item"
+               :class="{ completed: todo.completed }">
+            <input type="checkbox"
+                   :checked="todo.completed"
+                   @change="$emit('toggle-todo', todo.id)">
+            <span class="todo-text">{{ todo.text }}</span>
+            <button class="delete-todo" @click="$emit('delete-todo', todo.id)">×</button>
+          </div>
+          <div v-if="filteredTodos.length === 0" class="empty-state">
+            {{ emptyMessage }}
+          </div>
+        </div>
+      </div>
+
+      <!-- 模板管理模式 -->
+      <div v-else class="template-mode">
+        <div class="template-list">
+          <div
+            v-for="template in templateTags"
+            :key="template.id"
+            class="template-item"
+          >
+            <div
+              class="template-tag"
+              :style="{ backgroundColor: template.color }"
+            >
+              {{ template.displayText }}
+            </div>
+            <div class="template-actions">
+              <button class="edit-btn" @click="$emit('edit-template', template)">
+                编辑
+              </button>
+              <button class="delete-btn" @click="$emit('delete-template', template.id)">
+                删除
+              </button>
+            </div>
+          </div>
+          <div v-if="templateTags.length === 0" class="empty-templates">
+            暂无tag，创建一个吧！
+          </div>
+        </div>
+        <div class="template-footer">
+          <button class="new-template-btn" @click="$emit('new-template')">
+            新建tag
+          </button>
         </div>
       </div>
     </div>
@@ -162,9 +199,13 @@
     name: 'TodoSidebar',
     props: {
       selectedDate: Date,
-      todos: Object
+      todos: Object,
+      templateTags: {
+        type: Array,
+        default: () => []
+      }
     },
-    emits: ['add-todo', 'toggle-todo', 'delete-todo', 'logout', 'background-change'],
+    emits: ['add-todo', 'toggle-todo', 'delete-todo', 'logout', 'background-change', 'new-template', 'edit-template', 'delete-template'],
     setup(props, { emit }) {
       const newTodoText = ref('')
       const activeTab = ref('today')
@@ -296,10 +337,6 @@
             return todayTodos
           case 'all':
             return Object.values(props.todos).flat()
-          case 'completed':
-            return Object.values(props.todos)
-              .flat()
-              .filter(todo => todo.completed)
           default:
             return todayTodos
         }
@@ -312,8 +349,6 @@
             return '暂无事项，添加一个吧！'
           case 'all':
             return '还没有任何待办事项'
-          case 'completed':
-            return '还没有添加tag'
           default:
             return '暂无事项'
         }
@@ -911,5 +946,89 @@
     color: #6c757d;
     padding: 40px 20px;
     font-style: italic;
+  }
+
+  /* 模板管理相关样式 */
+  .template-mode {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .template-list {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 20px;
+  }
+
+  .template-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px;
+    background: white;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .template-tag {
+    padding: 8px 16px;
+    border-radius: 20px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .template-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .edit-btn, .delete-btn {
+    padding: 6px 12px !important;
+    font-size: 0.8rem !important;
+    border-radius: 6px !important;
+  }
+
+  .edit-btn {
+    background: #a8e6cf !important;
+    color: #333 !important;
+  }
+
+  .edit-btn:hover {
+    background: #8cdbb9 !important;
+  }
+
+  .delete-btn {
+    background: #ffd3b6 !important;
+    color: #333 !important;
+  }
+
+  .delete-btn:hover {
+    background: #ffc4a1 !important;
+  }
+
+  .empty-templates {
+    text-align: center;
+    color: #6c757d;
+    padding: 40px 20px;
+    font-style: italic;
+  }
+
+  .template-footer {
+    border-top: 1px solid #e9ecef;
+    padding-top: 20px;
+  }
+
+  .new-template-btn {
+    width: 100%;
+    background: #ffaaa5 !important;
+    color: white !important;
+  }
+
+  .new-template-btn:hover {
+    background: #ff8b84 !important;
   }
 </style>

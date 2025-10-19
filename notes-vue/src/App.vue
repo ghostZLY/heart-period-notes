@@ -12,11 +12,15 @@
       <!-- 左侧记事栏 -->
       <TodoSidebar :selectedDate="selectedDate"
                    :todos="todos"
+                   :templateTags="templateTags"
                    @add-todo="addTodo"
                    @toggle-todo="toggleTodo"
                    @delete-todo="deleteTodo"
                    @logout="handleLogout"
-                   @background-change="handleBackgroundChange" />
+                   @background-change="handleBackgroundChange"
+                   @new-template="openTemplateModal"
+                   @edit-template="openTemplateModal"
+                   @delete-template="deleteTemplate" />
 
       <!-- 右侧日历 -->
       <Calendar :currentDate="currentDate"
@@ -37,6 +41,13 @@
                       :settings="periodSettings"
                       @close="closePeriodSettings"
                       @save-settings="savePeriodSettings" />
+
+      <TemplateModal
+        v-if="showTemplateModal"
+        :template="editingTemplate"
+        @close="closeTemplateModal"
+        @save="saveTemplate"
+      />
     </div>
   </div>
 </template>
@@ -48,6 +59,7 @@
   import PeriodModal from './components/PeriodModal.vue'
   import PeriodSettings from './components/PeriodSettings.vue'
   import LoginModal from './components/LoginModal.vue'
+  import TemplateModal from './components/TemplateModal.vue'
 
   export default {
     name: 'App',
@@ -56,7 +68,8 @@
       Calendar,
       PeriodModal,
       PeriodSettings,
-      LoginModal
+      LoginModal,
+      TemplateModal
     },
     setup() {
       const isLoggedIn = ref(false)
@@ -71,13 +84,16 @@
         opacity: 0.3
       })
 
-      // 从本地存储加载数据
-      const todos = ref(JSON.parse(localStorage.getItem('todos')) || {})
-      const periodDates = ref(JSON.parse(localStorage.getItem('periodDates')) || [])
-      const periodSettings = ref(JSON.parse(localStorage.getItem('periodSettings')) || {
-        duration: 6,
-        interval: 28
-      })
+    // 从本地存储加载数据
+    const todos = ref(JSON.parse(localStorage.getItem('todos')) || {})
+    const periodDates = ref(JSON.parse(localStorage.getItem('periodDates')) || [])
+    const periodSettings = ref(JSON.parse(localStorage.getItem('periodSettings')) || {
+      duration: 6,
+      interval: 28
+    })
+    const templateTags = ref(JSON.parse(localStorage.getItem('templateTags')) || [])
+    const showTemplateModal = ref(false)
+    const editingTemplate = ref(null)
 
       // 计算样式 - 弹窗和下拉菜单不受背景透明度影响
       const backgroundStyle = computed(() => {
@@ -232,6 +248,54 @@
         closePeriodSettings()
       }
 
+      // 打开模板弹窗
+      const openTemplateModal = (template = null) => {
+        editingTemplate.value = template
+        showTemplateModal.value = true
+      }
+
+      // 关闭模板弹窗
+      const closeTemplateModal = () => {
+        showTemplateModal.value = false
+        editingTemplate.value = null
+      }
+
+      // 保存模板
+      const saveTemplate = (templateData) => {
+        if (editingTemplate.value) {
+          // 编辑现有模板
+          const index = templateTags.value.findIndex(t => t.id === editingTemplate.value.id)
+          if (index > -1) {
+            templateTags.value[index] = {
+              ...templateData,
+              displayText: `#${templateData.name}#`
+            }
+          }
+        } else {
+          // 添加新模板
+          templateTags.value.push({
+            id: Date.now(),
+            ...templateData,
+            displayText: `#${templateData.name}#`
+          })
+        }
+        saveTemplateTags()
+        closeTemplateModal()
+      }
+
+      // 删除模板
+      const deleteTemplate = (templateId) => {
+        if (confirm('确定要删除这个模板吗？')) {
+          templateTags.value = templateTags.value.filter(t => t.id !== templateId)
+          saveTemplateTags()
+        }
+      }
+
+      // 保存模板数据到本地存储
+      const saveTemplateTags = () => {
+        localStorage.setItem('templateTags', JSON.stringify(templateTags.value))
+      }
+
       // 保存数据到本地存储
       const saveTodos = () => {
         localStorage.setItem('todos', JSON.stringify(todos.value))
@@ -262,8 +326,11 @@
         todos,
         periodDates,
         periodSettings,
+        templateTags,
         showPeriodModal,
         showPeriodSettings,
+        showTemplateModal,
+        editingTemplate,
         background,
         backgroundStyle,
         contentStyle,
@@ -280,7 +347,11 @@
         markPeriod,
         openPeriodSettings,
         closePeriodSettings,
-        savePeriodSettings
+        savePeriodSettings,
+        openTemplateModal,
+        closeTemplateModal,
+        saveTemplate,
+        deleteTemplate
       }
     }
   }
