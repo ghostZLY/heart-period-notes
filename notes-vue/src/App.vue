@@ -34,8 +34,12 @@
 
       <!-- 弹窗组件 -->
       <PeriodModal v-if="showPeriodModal"
+                   :selectedDate="currentDateStr"
+                   :existingRatings="currentDateRatings"
+                   :isPeriodDate="isPeriodDate"
                    @close="closePeriodModal"
-                   @mark-period="markPeriod" />
+                   @mark-period="markPeriod"
+                   @save-ratings="saveRatings" />
 
       <PeriodSettings v-if="showPeriodSettings"
                       :settings="periodSettings"
@@ -91,9 +95,15 @@
       duration: 6,
       interval: 28
     })
+    
     const templateTags = ref(JSON.parse(localStorage.getItem('templateTags')) || [])
     const showTemplateModal = ref(false)
     const editingTemplate = ref(null)
+    const dayRatings = ref(JSON.parse(localStorage.getItem('dayRatings')) || {})
+    // 计算属性 - 统一使用字符串格式
+    const currentDateStr = computed(() => formatDate(selectedDate.value))
+    const currentDateRatings = computed(() => dayRatings.value[currentDateStr.value] || null)
+    const isPeriodDate = computed(() => periodDates.value.includes(currentDateStr.value))
 
       // 计算样式 - 弹窗和下拉菜单不受背景透明度影响
       const backgroundStyle = computed(() => {
@@ -218,16 +228,39 @@
         showPeriodModal.value = false
       }
 
-      // 标记生理期
+    // 标记生理期
       const markPeriod = () => {
-        const dateStr = formatDate(selectedDate.value)
+        const dateStr = currentDateStr.value
         const index = periodDates.value.indexOf(dateStr)
+        
         if (index > -1) {
+          // 取消标记
           periodDates.value.splice(index, 1)
+          // 移除对应的等级标记
+          if (dayRatings.value[dateStr]) {
+            delete dayRatings.value[dateStr]
+            saveDayRatings()
+          }
         } else {
+          // 添加标记
           periodDates.value.push(dateStr)
         }
         savePeriodDates()
+        closePeriodModal()
+      }
+      // 保存等级标记
+      const saveRatings = (ratings) => {
+        const dateStr = currentDateStr.value
+        
+        if (ratings.bloodLevel > 0 || ratings.painLevel > 0) {
+          // 有等级标记，保存
+          dayRatings.value[dateStr] = ratings
+        } else {
+          // 没有等级标记，移除
+          delete dayRatings.value[dateStr]
+        }
+        
+        saveDayRatings()
         closePeriodModal()
       }
 
@@ -305,6 +338,11 @@
         localStorage.setItem('periodDates', JSON.stringify(periodDates.value))
       }
 
+      const saveDayRatings = () => {
+        localStorage.setItem('dayRatings', JSON.stringify(dayRatings.value))
+      }
+
+
       // 格式化日期
       const formatDate = (date) => {
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -334,6 +372,10 @@
         background,
         backgroundStyle,
         contentStyle,
+        dayRatings,
+        currentDateStr,
+        currentDateRatings,
+        isPeriodDate,
         handleLoginSuccess,
         handleLogout,
         handleBackgroundChange,
@@ -348,6 +390,7 @@
         openPeriodSettings,
         closePeriodSettings,
         savePeriodSettings,
+        saveRatings,
         openTemplateModal,
         closeTemplateModal,
         saveTemplate,
