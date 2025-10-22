@@ -150,6 +150,20 @@ export default {
       return getPredictedPeriodDates(nextPredictedStart)
     })
 
+    // 获取预测的排卵期日期
+    const ovulationDates = computed(() => {
+      if (props.periodDates.length === 0) return { ovulationDay: null, ovulationPeriod: [] }
+      
+      // 获取用于预测的起始日期
+      const predictionStartDate = getPredictionStartDate()
+      if (!predictionStartDate) return { ovulationDay: null, ovulationPeriod: [] }
+      
+      // 计算下一次预测的生理期开始日期
+      const nextPredictedStart = new Date(predictionStartDate)
+      nextPredictedStart.setDate(predictionStartDate.getDate() + props.periodSettings.interval)
+      
+      return getPredictedOvulationDates(nextPredictedStart)
+    })
     // 获取日期样式类
     const getDayClasses = (day) => {
       const classes = []
@@ -169,9 +183,21 @@ export default {
       if (props.periodDates.includes(day.dateStr)) {
         classes.push('period-marked')
       }
-      
+      // 预测生理期（淡红色）
       if (predictedDates.value.includes(day.dateStr) && !props.periodDates.includes(day.dateStr)) {
         classes.push('period-predicted')
+      }
+
+      // 排卵日（深紫色）
+      if (ovulationDates.value.ovulationDay === day.dateStr && !props.periodDates.includes(day.dateStr)) {
+        classes.push('ovulation-day')
+      }
+      
+      // 排卵期（淡紫色）
+      if (ovulationDates.value.ovulationPeriod.includes(day.dateStr) && 
+          ovulationDates.value.ovulationDay !== day.dateStr && 
+          !props.periodDates.includes(day.dateStr)) {
+        classes.push('ovulation-period')
       }
       
       return classes
@@ -340,6 +366,36 @@ export default {
       }
       
       return predictedDates
+    }
+    // 获取预测的排卵期日期
+    const getPredictedOvulationDates = (periodStartDate) => {
+      const ovulationDates = {
+        ovulationDay: null,
+        ovulationPeriod: []
+      }
+      
+      // 计算排卵日：下次月经来潮前14天
+      const ovulationDay = new Date(periodStartDate)
+      ovulationDay.setDate(periodStartDate.getDate() - 14)
+      
+      ovulationDates.ovulationDay = formatDate(
+        ovulationDay.getFullYear(),
+        ovulationDay.getMonth(),
+        ovulationDay.getDate()
+      )
+      
+      // 计算排卵期：排卵日前5天和后4天，共10天
+      for (let i = -5; i <= 4; i++) {
+        const currentDate = new Date(ovulationDay)
+        currentDate.setDate(ovulationDay.getDate() + i)
+        ovulationDates.ovulationPeriod.push(formatDate(
+          currentDate.getFullYear(),
+          currentDate.getMonth(),
+          currentDate.getDate()
+        ))
+      }
+      
+      return ovulationDates
     }
 
     // 工具函数
@@ -594,6 +650,17 @@ export default {
 .period-predicted {
   background: #fff0f6 !important;
   border: 2px solid #ffadd2 !important;
+}
+/* 排卵日样式 - 深紫色 */
+.ovulation-day {
+  background: #e8d4f7 !important;
+  border: 2px solid #ce8fea !important;
+}
+
+/* 排卵期样式 - 淡紫色 */
+.ovulation-period {
+  background: #f3e8fd !important;
+  border: 2px solid #bb8fce !important;
 }
 
 /* 移动端适配 */
