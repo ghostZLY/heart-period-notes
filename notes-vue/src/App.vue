@@ -483,28 +483,45 @@
 }
 </script>
 
-<style scoped>
-.app-container {
-  width: 100%;
-  height: 100vh;
-  overflow: hidden;
-  position: relative;
-}
+<style>
+  .app-container {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+  }
 
-.background-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-}
+  .background-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
 
-.app-content {
-  display: flex;
-  flex-direction: row;
-  height: 100vh;
-  width: 100%;
-  position: relative;
-}
+  .app-content {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    z-index: 2;
+    transition: opacity 0.3s ease;
+  }
+
+  /* 确保所有弹窗和下拉菜单都在最顶层且完全不透明 */
+  .modal,
+  .edit-dialog-overlay,
+  .dropdown-menu,
+  .login-modal {
+    z-index: 1000 !important;
+    opacity: 1 !important;
+  }
+
+  .modal-content,
+  .edit-dialog,
+  .dropdown-menu,
+  .login-container {
+    opacity: 1 !important;
+    background: white !important;
+  }
 </style>
