@@ -22,6 +22,14 @@
           @contextmenu.prevent="openPeriodModal(day)" 
         >
           <div class="day-number">{{ day.number }}</div>
+          <!-- 心情按钮/图标 -->
+          <div 
+            class="mood-indicator"
+            :class="{ 'has-mood': getMoodForDate(day.date) }"
+            @click.stop="openMoodPopup(day)"
+          >
+            {{ getMoodEmoji(day.date) || '' }}
+          </div>
           <!-- 添加点击标记的提示 -->
           <div v-if="!day.isOtherMonth" class="day-hint"></div>
         </div>
@@ -41,9 +49,10 @@ export default {
     currentDate: Date,
     selectedDate: Date,
     periodDates: Array,
-    periodSettings: Object
+    periodSettings: Object,
+    moodRecords:Object
   },
-  emits: ['date-select', 'month-change', 'period-mark', 'open-settings'],
+  emits: ['date-select', 'month-change', 'period-mark', 'open-settings','mood-click'],
   setup(props, { emit }) {
     const weekdays = ['日', '一', '二', '三', '四', '五', '六']
     const monthNames = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
@@ -342,6 +351,28 @@ export default {
       const [year, month, day] = dateStr.split('-').map(Number)
       return new Date(year, month - 1, day)
     }
+    // 获取指定日期的心情数据
+    const getMoodForDate = (date) => {
+      if (!date) return null
+      const dateKey = formatDate(date.getFullYear(), date.getMonth(), date.getDate())
+      return props.moodRecords?.[dateKey] || null
+    }
+
+    // 获取心情表情符号
+    const getMoodEmoji = (date) => {
+      const moodData = getMoodForDate(date)
+      return moodData?.emoji || null
+    }
+
+    // 打开心情弹窗
+    const openMoodPopup = (day) => {
+      if (!day.isOtherMonth) {
+        // 先选择这个日期
+        emit('date-select', day.date)
+        // 然后触发心情点击事件
+        emit('mood-click', day.date)
+      }
+    }
 
     return {
       weekdays,
@@ -352,7 +383,10 @@ export default {
       selectDate,
       openPeriodModal,
       prevMonth,
-      nextMonth
+      nextMonth,
+      getMoodForDate,
+      getMoodEmoji, 
+      openMoodPopup
     }
   }
 }
@@ -443,6 +477,7 @@ export default {
 }
 
 .day {
+  position: relative;
   background: white;
   min-height: 100px;
   display: flex;
@@ -451,7 +486,6 @@ export default {
   align-items: center;
   cursor: pointer;
   transition: all 0.2s;
-  position: relative;
   padding: 8px 5px;
 }
 
@@ -486,10 +520,46 @@ export default {
   color: #ccc;
 }
 
+/* 心情指示器样式 */
+.mood-indicator {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e0e0e0;
+}
+
+.mood-indicator:hover {
+  background: #f0f8ff;
+  border-color: #007bff;
+  transform: scale(1.1);
+}
+
+.mood-indicator.has-mood {
+  border: none;
+  background: transparent;
+  font-size: 14px;
+}
+
+.mood-indicator.has-mood:hover {
+  transform: scale(1.2);
+  background: rgba(255, 255, 255, 0.8);
+}
+
 .day-number {
   font-size: 1.1rem;
   font-weight: 500;
   margin-bottom: 5px;
+  margin-top: 8px; /* 给心情图标留出空间 */
 }
 
 .day-hint {
@@ -515,8 +585,8 @@ export default {
 .period-marked::after {
   content: "●";
   position: absolute;
-  bottom: 5px;
-  right: 5px;
+  bottom: 8px;
+  right: 8px;
   font-size: 10px;
   color: #f44336;
 }
@@ -524,5 +594,18 @@ export default {
 .period-predicted {
   background: #fff0f6 !important;
   border: 2px solid #ffadd2 !important;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .mood-indicator {
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+  }
+  
+  .mood-indicator.has-mood {
+    font-size: 12px;
+  }
 }
 </style>
