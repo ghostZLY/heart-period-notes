@@ -1,36 +1,191 @@
 <template>
   <div class="todo-sidebar">
     <div class="todo-header">
+      <!-- 用户信息区域 -->
+      <div class="user-info" @click="toggleDropdown">
+        <div class="avatar">
+          <img v-if="userInfo.avatar" :src="userInfo.avatar" alt="头像">
+          <div v-else class="default-avatar">
+            {{ userInfo.nickname ? userInfo.nickname.charAt(0) : '用' }}
+          </div>
+        </div>
+        <div class="nickname">{{ userInfo.nickname || '用户' }}</div>
+
+        <!-- 下拉菜单 -->
+        <div v-if="showDropdown" class="dropdown-menu">
+          <div class="dropdown-item" @click="openEditDialog">
+            <span>修改信息</span>
+          </div>
+          <div class="dropdown-item" @click="logout">
+            <span>退出登录</span>
+          </div>
+        </div>
+      </div>
+
       <h2>记事本</h2>
       <div class="selected-date">{{ selectedDateDisplay }}</div>
     </div>
-    <div class="todo-content">
-      <div class="todo-input-section">
-        <input
-          type="text"
-          v-model="newTodoText"
-          @keyup.enter="addTodo"
-          placeholder="添加新事项..."
-        >
-        <button @click="addTodo">添加</button>
-      </div>
-      <div class="todo-list">
-        <div
-          v-for="todo in currentTodos"
-          :key="todo.id"
-          class="todo-item"
-          :class="{ completed: todo.completed }"
-        >
-          <input
-            type="checkbox"
-            :checked="todo.completed"
-            @change="$emit('toggle-todo', todo.id)"
-          >
-          <span class="todo-text">{{ todo.text }}</span>
-          <button class="delete-todo" @click="$emit('delete-todo', todo.id)">×</button>
+
+    <!-- 个人信息编辑对话框 -->
+    <div v-if="showEditDialog" class="edit-dialog-overlay" @click="showEditDialog = false">
+      <div class="edit-dialog" @click.stop>
+        <h3>修改个人信息</h3>
+        <div class="edit-form">
+          <div class="form-group">
+            <label>头像</label>
+            <div class="avatar-upload">
+              <div class="avatar-preview" @click="triggerAvatarUpload">
+                <img v-if="editUserInfo.avatar" :src="editUserInfo.avatar" alt="头像预览">
+                <div v-else class="default-avatar">
+                  {{ editUserInfo.nickname ? editUserInfo.nickname.charAt(0) : '用' }}
+                </div>
+                <input type="file"
+                       ref="avatarInput"
+                       @change="handleAvatarUpload"
+                       accept="image/*"
+                       style="display: none">
+              </div>
+              <button type="button" @click="triggerAvatarUpload" class="upload-btn">
+                选择图片
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="nickname">昵称</label>
+            <input type="text"
+                   id="nickname"
+                   v-model="editUserInfo.nickname"
+                   placeholder="请输入昵称"
+                   maxlength="20">
+          </div>
+          <div class="form-group">
+            <label>背景图片</label>
+            <div class="background-upload">
+              <div class="background-preview" @click="triggerBackgroundUpload">
+                <img v-if="editUserInfo.background" :src="editUserInfo.background" alt="背景预览">
+                <div v-else class="default-background">
+                  <span>点击上传背景</span>
+                </div>
+                <input type="file"
+                       ref="backgroundInput"
+                       @change="handleBackgroundUpload"
+                       accept="image/*"
+                       style="display: none">
+              </div>
+              <div class="background-controls">
+                <button type="button" @click="triggerBackgroundUpload" class="upload-btn">
+                  选择背景图片
+                </button>
+                <button v-if="editUserInfo.background" type="button" @click="removeBackground" class="remove-btn">
+                  移除背景
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 背景不透明度调节 -->
+          <div v-if="editUserInfo.background" class="form-group">
+            <label for="opacity-slider">
+              背景不透明度: {{ Math.round(editUserInfo.backgroundOpacity * 100) }}%
+            </label>
+            <div class="opacity-control">
+              <input type="range"
+                     id="opacity-slider"
+                     v-model.number="editUserInfo.backgroundOpacity"
+                     min="0.1"
+                     max="1"
+                     step="0.05"
+                     class="opacity-slider">
+              <div class="opacity-preview">
+              </div>
+            </div>
+          </div>
+
+          <div class="dialog-actions">
+            <button @click="showEditDialog = false" class="cancel-btn">取消</button>
+            <button @click="saveUserInfo" class="save-btn">保存</button>
+          </div>
         </div>
-        <div v-if="currentTodos.length === 0" class="empty-state">
-          暂无事项，添加一个吧！
+      </div>
+    </div>
+
+    <!-- Tab栏 -->
+    <div class="tab-container">
+      <button class="tab-button"
+              :class="{ active: activeTab === 'today' }"
+              @click="activeTab = 'today'">
+        今日事项
+      </button>
+      <button class="tab-button"
+              :class="{ active: activeTab === 'all' }"
+              @click="activeTab = 'all'">
+        所有事项
+      </button>
+      <button class="tab-button"
+              :class="{ active: activeTab === 'templates' }"
+              @click="activeTab = 'templates'">
+        tag管理
+      </button>
+    </div>
+
+    <div class="todo-content">
+      <!-- 待办事项模式 -->
+      <div v-if="activeTab !== 'templates'">
+        <div class="todo-input-section">
+          <input type="text"
+                 v-model="newTodoText"
+                 @keyup.enter="addTodo"
+                 placeholder="添加新事项...">
+          <button @click="addTodo">添加</button>
+        </div>
+        <div class="todo-list">
+          <div v-for="todo in filteredTodos"
+               :key="todo.id"
+               class="todo-item"
+               :class="{ completed: todo.completed }">
+            <input type="checkbox"
+                   :checked="todo.completed"
+                   @change="$emit('toggle-todo', todo.id)">
+            <span class="todo-text">{{ todo.text }}</span>
+            <button class="delete-todo" @click="$emit('delete-todo', todo.id)">×</button>
+          </div>
+          <div v-if="filteredTodos.length === 0" class="empty-state">
+            {{ emptyMessage }}
+          </div>
+        </div>
+      </div>
+
+      <!-- 模板管理模式 -->
+      <div v-else class="template-mode">
+        <div class="template-list">
+          <div
+            v-for="template in templateTags"
+            :key="template.id"
+            class="template-item"
+          >
+            <div
+              class="template-tag"
+              :style="{ backgroundColor: template.color }"
+            >
+              {{ template.displayText }}
+            </div>
+            <div class="template-actions">
+              <button class="edit-btn" @click="$emit('edit-template', template)">
+                编辑
+              </button>
+              <button class="delete-btn" @click="$emit('delete-template', template.id)">
+                删除
+              </button>
+            </div>
+          </div>
+          <div v-if="templateTags.length === 0" class="empty-templates">
+            暂无tag，创建一个吧！
+          </div>
+        </div>
+        <div class="template-footer">
+          <button class="new-template-btn" @click="$emit('new-template')">
+            新建tag
+          </button>
         </div>
       </div>
     </div>
@@ -38,204 +193,842 @@
 </template>
 
 <script>
-import { computed, ref } from 'vue'
+  import { computed, ref, onMounted } from 'vue'
 
-export default {
-  name: 'TodoSidebar',
-  props: {
-    selectedDate: Date,
-    todos: Object
-  },
-  emits: ['add-todo', 'toggle-todo', 'delete-todo'],
-  setup(props, { emit }) {
-    const newTodoText = ref('')
-
-    // 当前选中日期的待办事项
-    const currentTodos = computed(() => {
-      const dateKey = formatDate(props.selectedDate)
-      return props.todos[dateKey] || []
-    })
-
-    // 选中日期显示
-    const selectedDateDisplay = computed(() => {
-      if (isToday(props.selectedDate)) {
-        return '今天'
-      } else if (isTomorrow(props.selectedDate)) {
-        return '明天'
-      } else if (isYesterday(props.selectedDate)) {
-        return '昨天'
-      } else {
-        return props.selectedDate.toLocaleDateString('zh-CN', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          weekday: 'long'
-        })
+  export default {
+    name: 'TodoSidebar',
+    props: {
+      selectedDate: Date,
+      todos: Object,
+      templateTags: {
+        type: Array,
+        default: () => []
       }
-    })
+    },
+    emits: ['add-todo', 'toggle-todo', 'delete-todo', 'logout', 'background-change', 'new-template', 'edit-template', 'delete-template'],
+    setup(props, { emit }) {
+      const newTodoText = ref('')
+      const activeTab = ref('today')
+      const showEditDialog = ref(false)
+      const showDropdown = ref(false)
+      const avatarInput = ref(null)
+      const backgroundInput = ref(null)
 
-    // 添加待办事项
-    const addTodo = () => {
-      if (newTodoText.value.trim()) {
-        emit('add-todo', newTodoText.value.trim())
-        newTodoText.value = ''
+      // 用户信息
+      const userInfo = ref({
+        nickname: '',
+        avatar: '',
+        background: '',
+        backgroundOpacity: 0.3
+      })
+
+      // 编辑时的用户信息副本
+      const editUserInfo = ref({
+        nickname: '',
+        avatar: '',
+        background: '',
+        backgroundOpacity: 0.3
+      })
+
+      // 从本地存储加载用户信息
+      const loadUserInfo = () => {
+        const saved = localStorage.getItem('userInfo')
+        if (saved) {
+          const userData = JSON.parse(saved)
+          userInfo.value = {
+            nickname: userData.nickname || '',
+            avatar: userData.avatar || '',
+            background: userData.background || '',
+            backgroundOpacity: userData.backgroundOpacity || 0.3
+          }
+          // 通知父组件背景变化
+          emitBackgroundChange()
+        }
       }
-    }
 
-    // 工具函数
-    const formatDate = (date) => {
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-    }
+      // 保存用户信息到本地存储
+      const saveUserInfo = () => {
+        userInfo.value = { ...editUserInfo.value }
+        localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
+        showEditDialog.value = false
+        // 通知父组件背景变化
+        emitBackgroundChange()
+      }
 
-    const isToday = (date) => {
-      const today = new Date()
-      return date.getDate() === today.getDate() &&
-             date.getMonth() === today.getMonth() &&
-             date.getFullYear() === today.getFullYear()
-    }
+      // 发送背景变化事件
+      const emitBackgroundChange = () => {
+        const backgroundData = {
+          image: userInfo.value.background,
+          opacity: userInfo.value.backgroundOpacity
+        }
+        emit('background-change', backgroundData)
+      }
 
-    const isTomorrow = (date) => {
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      return date.getDate() === tomorrow.getDate() &&
-             date.getMonth() === tomorrow.getMonth() &&
-             date.getFullYear() === tomorrow.getFullYear()
-    }
+      // 切换下拉菜单
+      const toggleDropdown = () => {
+        showDropdown.value = !showDropdown.value
+      }
 
-    const isYesterday = (date) => {
-      const yesterday = new Date()
-      yesterday.setDate(yesterday.getDate() - 1)
-      return date.getDate() === yesterday.getDate() &&
-             date.getMonth() === yesterday.getMonth() &&
-             date.getFullYear() === yesterday.getFullYear()
-    }
+      // 打开编辑对话框
+      const openEditDialog = () => {
+        editUserInfo.value = { ...userInfo.value }
+        showEditDialog.value = true
+        showDropdown.value = false
+      }
 
-    return {
-      newTodoText,
-      currentTodos,
-      selectedDateDisplay,
-      addTodo
+      // 退出登录
+      const logout = () => {
+        localStorage.removeItem('currentUser')
+        emit('logout') // 触发父组件的退出登录处理
+        showDropdown.value = false
+      }
+
+      // 触发头像上传
+      const triggerAvatarUpload = () => {
+        avatarInput.value?.click()
+      }
+
+      // 处理头像上传
+      const handleAvatarUpload = (event) => {
+        const file = event.target.files[0]
+        if (file) {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            editUserInfo.value.avatar = e.target.result
+          }
+          reader.readAsDataURL(file)
+        }
+      }
+
+      // 触发背景上传
+      const triggerBackgroundUpload = () => {
+        backgroundInput.value?.click()
+      }
+
+      // 处理背景上传
+      const handleBackgroundUpload = (event) => {
+        const file = event.target.files[0]
+        if (file) {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            editUserInfo.value.background = e.target.result
+            // 上传背景后默认设置不透明度为30%
+            if (!editUserInfo.value.backgroundOpacity) {
+              editUserInfo.value.backgroundOpacity = 0.3
+            }
+          }
+          reader.readAsDataURL(file)
+        }
+      }
+
+      // 移除背景
+      const removeBackground = () => {
+        editUserInfo.value.background = ''
+        editUserInfo.value.backgroundOpacity = 0.3
+      }
+
+      // 根据tab过滤待办事项
+      const filteredTodos = computed(() => {
+        const dateKey = formatDate(props.selectedDate)
+        const todayTodos = props.todos[dateKey] || []
+
+        switch (activeTab.value) {
+          case 'today':
+            return todayTodos
+          case 'all':
+            return Object.values(props.todos).flat()
+          default:
+            return todayTodos
+        }
+      })
+
+      // 空状态提示信息
+      const emptyMessage = computed(() => {
+        switch (activeTab.value) {
+          case 'today':
+            return '暂无事项，添加一个吧！'
+          case 'all':
+            return '还没有任何待办事项'
+          default:
+            return '暂无事项'
+        }
+      })
+
+      // 当前选中日期的待办事项
+      const currentTodos = computed(() => {
+        const dateKey = formatDate(props.selectedDate)
+        return props.todos[dateKey] || []
+      })
+
+      // 选中日期显示
+      const selectedDateDisplay = computed(() => {
+        if (isToday(props.selectedDate)) {
+          return '今天'
+        } else if (isTomorrow(props.selectedDate)) {
+          return '明天'
+        } else if (isYesterday(props.selectedDate)) {
+          return '昨天'
+        } else {
+          return props.selectedDate.toLocaleDateString('zh-CN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+          })
+        }
+      })
+
+      // 添加待办事项
+      const addTodo = () => {
+        if (newTodoText.value.trim()) {
+          emit('add-todo', newTodoText.value.trim())
+          newTodoText.value = ''
+        }
+      }
+
+      // 工具函数
+      const formatDate = (date) => {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      }
+
+      const isToday = (date) => {
+        const today = new Date()
+        return date.getDate() === today.getDate() &&
+          date.getMonth() === today.getMonth() &&
+          date.getFullYear() === today.getFullYear()
+      }
+
+      const isTomorrow = (date) => {
+        const tomorrow = new Date()
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        return date.getDate() === tomorrow.getDate() &&
+          date.getMonth() === tomorrow.getMonth() &&
+          date.getFullYear() === tomorrow.getFullYear()
+      }
+
+      const isYesterday = (date) => {
+        const yesterday = new Date()
+        yesterday.setDate(yesterday.getDate() - 1)
+        return date.getDate() === yesterday.getDate() &&
+          date.getMonth() === yesterday.getMonth() &&
+          date.getFullYear() === yesterday.getFullYear()
+      }
+
+      // 组件挂载时加载用户信息
+      onMounted(() => {
+        loadUserInfo()
+      })
+
+      return {
+        newTodoText,
+        activeTab,
+        filteredTodos,
+        emptyMessage,
+        currentTodos,
+        selectedDateDisplay,
+        addTodo,
+        userInfo,
+        editUserInfo,
+        showEditDialog,
+        showDropdown,
+        avatarInput,
+        backgroundInput,
+        toggleDropdown,
+        openEditDialog,
+        logout,
+        saveUserInfo,
+        triggerAvatarUpload,
+        handleAvatarUpload,
+        triggerBackgroundUpload,
+        handleBackgroundUpload,
+        removeBackground
+      }
     }
   }
-}
 </script>
 
 <style scoped>
-.todo-sidebar {
-  width: 350px;
-  background: #f8f9fa;
-  border-right: 1px solid #e9ecef;
-  display: flex;
-  flex-direction: column;
-}
+  .todo-sidebar {
+    width: 500px;
+    background: #f8f9fa;
+    border-right: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 10;
+  }
 
-.todo-header {
-  padding: 30px 25px;
-  background: linear-gradient(135deg, #e46f89 0%, #f4a8c9 100%);
-  color: white;
-}
+  .todo-header {
+    padding: 11px 25px;
+    background: linear-gradient(135deg, #e46f89 0%, #f4a8c9 100%);
+    color: white;
+    position: relative;
+  }
 
-.todo-header h2 {
-  font-size: 1.8rem;
-  margin-bottom: 8px;
-}
+    .todo-header h2 {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+      text-align: center;
+    }
 
-.selected-date {
-  font-size: 1rem;
-  opacity: 0.9;
-}
+  .selected-date {
+    font-size: 1rem;
+    opacity: 0.9;
+    text-align: center;
+  }
 
-.todo-content {
-  flex: 1;
-  padding: 25px;
-  display: flex;
-  flex-direction: column;
-}
+  /* 用户信息样式 */
+  .user-info {
+    position: absolute;
+    top: 15px;
+    left: 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 25px;
+    transition: background-color 0.3s;
+  }
 
-.todo-input-section {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 25px;
-}
+    .user-info:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
 
-input[type="text"] {
-  flex: 1;
-  padding: 12px 15px;
-  border: 2px solid #e1e5e9;
-  border-radius: 10px;
-  font-size: 1rem;
-  transition: border-color 0.3s;
-}
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-input[type="text"]:focus {
-  border-color: #eadf66;
-  outline: none;
-}
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
 
-button {
-  padding: 12px 20px;
-  background: #f7de63;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background 0.3s;
-}
+  .default-avatar {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: white;
+    font-size: 1.2rem;
+  }
 
-button:hover {
-  background: #f2d235;
-}
+  .nickname {
+    font-size: 1rem;
+    font-weight: 500;
+    color: white;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-.todo-list {
-  flex: 1;
-  overflow-y: auto;
-}
+  /* 下拉菜单样式 - 确保完全不透明 */
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white !important;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    min-width: 140px;
+    z-index: 1001 !important;
+    margin-top: 5px;
+    overflow: hidden;
+    opacity: 1 !important;
+  }
 
-.todo-item {
-  display: flex;
-  align-items: center;
-  padding: 15px;
-  background: white;
-  border-radius: 10px;
-  margin-bottom: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s;
-}
+  .dropdown-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    color: #333;
+    font-size: 0.9rem;
+    background: white !important;
+    opacity: 1 !important;
+  }
 
-.todo-item:hover {
-  transform: translateY(-2px);
-}
+    .dropdown-item:hover {
+      background: #f8f9fa !important;
+    }
 
-.todo-item input[type="checkbox"] {
-  margin-right: 12px;
-  width: 18px;
-  height: 18px;
-}
+    .dropdown-item:not(:last-child) {
+      border-bottom: 1px solid #f0f0f0;
+    }
 
-.todo-text {
-  flex: 1;
-  font-size: 1rem;
-}
+  /* 编辑对话框样式 - 确保完全不透明 */
+  .edit-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000 !important;
+    opacity: 1 !important;
+  }
 
-.todo-item.completed .todo-text {
-  text-decoration: line-through;
-  color: #6c757d;
-}
+  .edit-dialog {
+    background: white !important;
+    border-radius: 15px;
+    padding: 30px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-height: 80vh;
+    overflow-y: auto;
+    opacity: 1 !important;
+    z-index: 1001;
+  }
 
-.delete-todo {
-  background: none;
-  border: none;
-  color: #dc3545;
-  cursor: pointer;
-  font-size: 1.2rem;
-  padding: 5px;
-}
+    .edit-dialog h3 {
+      margin-bottom: 20px;
+      text-align: center;
+      color: #333;
+      font-size: 1.5rem;
+    }
 
-.empty-state {
-  text-align: center;
-  color: #6c757d;
-  padding: 40px 20px;
-  font-style: italic;
-}
+  .edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+    .form-group label {
+      font-weight: 500;
+      color: #555;
+    }
+
+  .avatar-upload, .background-upload {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+
+  .background-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .avatar-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px dashed #ddd;
+    position: relative;
+  }
+
+  .background-preview {
+    width: 120px;
+    height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px dashed #ddd;
+    position: relative;
+  }
+
+    .avatar-preview img, .background-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+
+  .avatar-preview .default-avatar {
+    background: linear-gradient(135deg, #e46f89 0%, #f4a8c9 100%);
+    border-radius: 50%;
+  }
+
+  .default-background {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-size: 0.8rem;
+    text-align: center;
+    padding: 10px;
+  }
+
+  .avatar-preview:hover, .background-preview:hover {
+    border-color: #e46f89;
+  }
+
+  .upload-btn, .remove-btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+  }
+
+  .upload-btn {
+    background: #f8f9fa;
+    color: #333;
+  }
+
+    .upload-btn:hover {
+      background: #e9ecef;
+      border-color: #e46f89;
+    }
+
+  .remove-btn {
+    background: #e46f89;
+    color: white;
+    border-color: #e46f89;
+  }
+
+    .remove-btn:hover {
+      background: #c82333;
+      border-color: #bd2130;
+    }
+
+  /* 不透明度控制样式 */
+  .opacity-control {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .opacity-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #e1e5e9;
+    outline: none;
+    -webkit-appearance: none;
+  }
+
+    .opacity-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e46f89;
+      cursor: pointer;
+    }
+
+    .opacity-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e46f89;
+      cursor: pointer;
+      border: none;
+    }
+
+  .opacity-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.8rem;
+    color: #666;
+  }
+
+  .preview-bar {
+    width: 60px;
+    height: 20px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .preview-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #e46f89 0%, #f4a8c9 100%);
+    transition: opacity 0.3s ease;
+  }
+
+  .edit-dialog input[type="text"] {
+    padding: 12px 15px;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+  }
+
+    .edit-dialog input[type="text"]:focus {
+      border-color: #e46f89;
+      outline: none;
+    }
+
+  .dialog-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 10px;
+  }
+
+  .cancel-btn, .save-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.3s;
+  }
+
+  .cancel-btn {
+    background: #6c757d;
+    color: white;
+  }
+
+    .cancel-btn:hover {
+      background: #5a6268;
+    }
+
+  .save-btn {
+    background: #e46f89;
+    color: white;
+  }
+
+    .save-btn:hover {
+      background: #d65a7a;
+    }
+
+  /* Tab栏样式 */
+  .tab-container {
+    display: flex;
+    background: white;
+    border-bottom: 1px solid #e9ecef;
+    padding: 0 25px;
+  }
+
+  .tab-button {
+    flex: 1;
+    padding: 15px 0;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #6c757d;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+
+    .tab-button:hover {
+      color: #e46f89;
+      background-color: #f8f9fa;
+    }
+
+    .tab-button.active {
+      color: #e46f89;
+      background-color: #fffafc;
+    }
+
+  .todo-content {
+    flex: 1;
+    padding: 25px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .todo-input-section {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    padding: 12px 15px;
+    border: 2px solid #e1e5e9;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+  }
+
+    input[type="text"]:focus {
+      border-color: #eadf66;
+      outline: none;
+    }
+
+  button {
+    padding: 12px 20px;
+    background: #f7de63;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.3s;
+  }
+
+    button:hover {
+      background: #f2d235;
+    }
+
+  .todo-list {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .todo-item {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background: white;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+  }
+
+    .todo-item:hover {
+      transform: translateY(-2px);
+    }
+
+    .todo-item input[type="checkbox"] {
+      margin-right: 12px;
+      width: 18px;
+      height: 18px;
+    }
+
+  .todo-text {
+    flex: 1;
+    font-size: 1rem;
+  }
+
+  .todo-item.completed .todo-text {
+    text-decoration: line-through;
+    color: #6c757d;
+  }
+
+  .delete-todo {
+    background: none;
+    border: none;
+    color: #dc3545;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 5px;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: #6c757d;
+    padding: 40px 20px;
+    font-style: italic;
+  }
+
+  /* 模板管理相关样式 */
+  .template-mode {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .template-list {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 20px;
+  }
+
+  .template-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px;
+    background: white;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .template-tag {
+    padding: 8px 16px;
+    border-radius: 20px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .template-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .edit-btn, .delete-btn {
+    padding: 6px 12px !important;
+    font-size: 0.8rem !important;
+    border-radius: 6px !important;
+  }
+
+  .edit-btn {
+    background: #a8e6cf !important;
+    color: #333 !important;
+  }
+
+  .edit-btn:hover {
+    background: #8cdbb9 !important;
+  }
+
+  .delete-btn {
+    background: #ffd3b6 !important;
+    color: #333 !important;
+  }
+
+  .delete-btn:hover {
+    background: #ffc4a1 !important;
+  }
+
+  .empty-templates {
+    text-align: center;
+    color: #6c757d;
+    padding: 40px 20px;
+    font-style: italic;
+  }
+
+  .template-footer {
+    border-top: 1px solid #e9ecef;
+    padding-top: 20px;
+  }
+
+  .new-template-btn {
+    width: 100%;
+    background: #ffaaa5 !important;
+    color: white !important;
+  }
+
+  .new-template-btn:hover {
+    background: #ff8b84 !important;
+  }
 </style>
