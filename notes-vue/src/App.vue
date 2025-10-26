@@ -28,6 +28,7 @@
                 :periodDates="periodDates"
                 :periodSettings="periodSettings"
                 :moodRecords="moodRecords"
+                :dayRatings="dayRatings"
                 @date-select="selectDate"
                 @month-change="changeMonth"
                 @period-mark="openPeriodModal"

@@ -30,6 +30,27 @@
           >
             {{ getMoodEmoji(day.date) || '' }}
           </div>
+          <!-- 血量和痛度标记显示 -->
+          <div v-if="dayRatings && dayRatings[day.dateStr]" class="rating-indicators">
+            <!-- 血量标记 -->
+            <div v-if="dayRatings[day.dateStr].bloodLevel > 0" class="blood-indicator">
+              <div 
+                v-for="level in 3" 
+                :key="'blood-indicator-' + level"
+                class="indicator-rect"
+                :class="{ active: dayRatings[day.dateStr].bloodLevel >= level }"
+              ></div>
+            </div>
+            <!-- 痛度标记 -->
+            <div v-if="dayRatings[day.dateStr].painLevel > 0" class="pain-indicator">
+              <div 
+                v-for="level in 3" 
+                :key="'pain-indicator-' + level"
+                class="indicator-rect"
+                :class="{ active: dayRatings[day.dateStr].painLevel >= level }"
+              ></div>
+            </div>
+          </div>
           <!-- 添加点击标记的提示 -->
           <div v-if="!day.isOtherMonth" class="day-hint"></div>
         </div>
@@ -50,7 +71,8 @@ export default {
     selectedDate: Date,
     periodDates: Array,
     periodSettings: Object,
-    moodRecords:Object
+    moodRecords: Object,
+    dayRatings: Object
   },
   emits: ['date-select', 'month-change', 'period-mark', 'open-settings','mood-click'],
   setup(props, { emit }) {
@@ -661,6 +683,47 @@ export default {
 .ovulation-period {
   background: #f3e8fd !important;
   border: 2px solid #bb8fce !important;
+}
+/* 血量和痛度标记样式*/
+.rating-indicators {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+}
+
+.blood-indicator,
+.pain-indicator {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  justify-content: center;
+}
+
+.indicator-rect {
+  flex: 1;
+  max-width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+/* 血量标记 - 粉色 */
+.blood-indicator .indicator-rect.active {
+  background: #f18cac;
+  border-color: #f18cac;
+}
+
+/* 痛度标记 - 蓝色 */
+.pain-indicator .indicator-rect.active {
+  background: #76b6ea;
+  border-color: #76b6ea;
 }
 
 /* 移动端适配 */
