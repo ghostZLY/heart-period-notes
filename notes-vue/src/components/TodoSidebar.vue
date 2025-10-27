@@ -132,10 +132,31 @@
       <!-- 待办事项模式 -->
       <div v-if="activeTab !== 'templates'">
         <div class="todo-input-section">
-          <input type="text"
-                 v-model="newTodoText"
-                 @keyup.enter="addTodo"
-                 placeholder="添加新事项...">
+          <div class="input-with-dropdown">
+            <input type="text"
+                   ref="todoInputRef"
+                   v-model="newTodoText"
+                   @focus="showTagDropdownHandler"
+                   @blur="hideTagDropdown"
+                   @keyup.enter="addTodo"
+                   placeholder="添加新事项...">
+            
+            <!-- Tag下拉列表 -->
+            <div v-if="showTagDropdown && templateTags.length > 0" 
+                 class="tag-dropdown"
+                 ref="tagDropdownRef">
+              <div class="tag-dropdown-list">
+                <div v-for="tag in templateTags"
+                     :key="tag.id"
+                     class="tag-dropdown-item"
+                     @mousedown="selectTag(tag)">
+                  <div class="tag-preview" :style="{ backgroundColor: tag.color }">
+                    {{ tag.displayText }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <button @click="addTodo">添加</button>
         </div>
         <div class="todo-list">
@@ -229,6 +250,11 @@
         background: '',
         backgroundOpacity: 0.3
       })
+
+      // 下拉列表相关状态
+      const showTagDropdown = ref(false)
+      const tagDropdownRef = ref(null)
+      const todoInputRef = ref(null)
 
       // 从本地存储加载用户信息
       const loadUserInfo = () => {
@@ -378,11 +404,45 @@
         }
       })
 
+      // 显示tag下拉列表
+      const showTagDropdownHandler = () => {
+        if (props.templateTags.length > 0) {
+          showTagDropdown.value = true
+        }
+      }
+
+      // 隐藏tag下拉列表
+      const hideTagDropdown = () => {
+        showTagDropdown.value = false
+      }
+
+      // 选择tag
+      const selectTag = (tag) => {
+        const displayText = tag.displayText || `#${tag.name}#`
+        
+        // 如果输入框为空，直接设置文本
+        if (!newTodoText.value.trim()) {
+          newTodoText.value = displayText
+        } else {
+          // 如果输入框已有内容，在末尾添加tag
+          newTodoText.value = newTodoText.value.trim() + ' ' + displayText
+        }
+        
+        // 隐藏下拉列表
+        hideTagDropdown()
+        
+        // 聚焦到输入框
+        if (todoInputRef.value) {
+          todoInputRef.value.focus()
+        }
+      }
+
       // 添加待办事项
       const addTodo = () => {
         if (newTodoText.value.trim()) {
           emit('add-todo', newTodoText.value.trim())
           newTodoText.value = ''
+          hideTagDropdown()
         }
       }
 
@@ -441,7 +501,14 @@
         handleAvatarUpload,
         triggerBackgroundUpload,
         handleBackgroundUpload,
-        removeBackground
+        removeBackground,
+        // 新增的tag相关函数和引用
+        showTagDropdown,
+        tagDropdownRef,
+        todoInputRef,
+        showTagDropdownHandler,
+        hideTagDropdown,
+        selectTag
       }
     }
   }
@@ -865,15 +932,23 @@
     display: flex;
     gap: 10px;
     margin-bottom: 25px;
+    position: relative;
+  }
+
+  .input-with-dropdown {
+    flex: 1;
+    position: relative;
+    display: flex;
   }
 
   input[type="text"] {
-    flex: 1;
+    width: 100%;
     padding: 12px 15px;
     border: 2px solid #e1e5e9;
     border-radius: 10px;
     font-size: 1rem;
     transition: border-color 0.3s;
+    box-sizing: border-box;
   }
 
     input[type="text"]:focus {
@@ -1030,5 +1105,51 @@
 
   .new-template-btn:hover {
     background: #ff8b84 !important;
+  }
+
+  /* Tag下拉列表样式 */
+  .tag-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #e1e5e9;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 1001;
+    margin-top: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .tag-dropdown-list {
+    padding: 8px;
+  }
+
+  .tag-dropdown-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+    margin-bottom: 4px;
+  }
+
+  .tag-dropdown-item:hover {
+    background-color: #f8f9fa;
+  }
+
+  .tag-dropdown-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .tag-preview {
+    padding: 6px 12px;
+    border-radius: 16px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: inline-block;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 </style>
