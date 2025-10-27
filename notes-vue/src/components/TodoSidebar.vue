@@ -122,10 +122,16 @@
         所有事项
       </button>
       <button class="tab-button"
+              :class="{ active: activeTab === 'search' }"
+              @click="activeTab = 'search'">
+        搜索
+      </button>
+      <button class="tab-button"
               :class="{ active: activeTab === 'templates' }"
               @click="activeTab = 'templates'">
         tag管理
       </button>
+    
     </div>
 
     <div class="todo-content">
@@ -133,14 +139,24 @@
       <div v-if="activeTab !== 'templates'">
         <div class="todo-input-section">
           <div class="input-with-dropdown">
-            <input type="text"
-                   ref="todoInputRef"
-                   v-model="newTodoText"
-                   @focus="showTagDropdownHandler"
-                   @blur="hideTagDropdown"
-                   @keyup.enter="addTodo"
-                   placeholder="添加新事项...">
-            
+          <!-- 今日事项和所有事项的输入框 -->
+          <input v-if="activeTab !== 'search'"
+                type="text"
+                ref="todoInputRef"
+                v-model="newTodoText"
+                @focus="showTagDropdownHandler"
+                @blur="hideTagDropdown"
+                @keyup.enter="addTodo"
+                placeholder="添加新事项...">
+            <!-- 搜索事项的输入框 -->
+            <input v-else
+                  type="text"
+                  ref="searchInputRef"
+                  v-model="searchText"
+                  @focus="showTagDropdownHandler"
+                  @blur="hideTagDropdown"
+                  @keyup.enter="performSearch"
+                  placeholder="搜索事项...">
             <!-- Tag下拉列表 -->
             <div v-if="showTagDropdown && templateTags.length > 0" 
                  class="tag-dropdown"
@@ -157,7 +173,8 @@
               </div>
             </div>
           </div>
-          <button @click="addTodo">添加</button>
+          <button v-if="activeTab !== 'search'" @click="addTodo">添加</button>
+          <button v-else @click="performSearch">搜索</button>
         </div>
         <div class="todo-list">
           <div v-for="todo in filteredTodos"
@@ -214,7 +231,7 @@
 </template>
 
 <script>
-  import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 
   export default {
     name: 'TodoSidebar',
@@ -229,11 +246,14 @@
     emits: ['add-todo', 'toggle-todo', 'delete-todo', 'logout', 'background-change', 'new-template', 'edit-template', 'delete-template'],
     setup(props, { emit }) {
       const newTodoText = ref('')
+      const searchText = ref('')
       const activeTab = ref('today')
       const showEditDialog = ref(false)
       const showDropdown = ref(false)
       const avatarInput = ref(null)
       const backgroundInput = ref(null)
+      // 搜索相关状态
+      const searchResults = ref([])
 
       // 用户信息
       const userInfo = ref({
@@ -255,7 +275,7 @@
       const showTagDropdown = ref(false)
       const tagDropdownRef = ref(null)
       const todoInputRef = ref(null)
-
+      const searchInputRef = ref(null)
       // 从本地存储加载用户信息
       const loadUserInfo = () => {
         const saved = localStorage.getItem('userInfo')
@@ -353,6 +373,22 @@
         editUserInfo.value.backgroundOpacity = 0.3
       }
 
+      // 执行搜索
+      const performSearch = () => {
+        if (!searchText.value.trim()) {
+          searchResults.value = []
+          return
+        }
+
+        const searchTerm = searchText.value.toLowerCase().trim()
+        const allTodos = Object.values(props.todos).flat()
+        
+        searchResults.value = allTodos.filter(todo => {
+          // 搜索事项文本和tag内容
+          return todo.text.toLowerCase().includes(searchTerm)
+        })
+      }
+
       // 根据tab过滤待办事项
       const filteredTodos = computed(() => {
         const dateKey = formatDate(props.selectedDate)
@@ -363,6 +399,8 @@
             return todayTodos
           case 'all':
             return Object.values(props.todos).flat()
+          case 'search':
+            return searchResults.value
           default:
             return todayTodos
         }
@@ -375,6 +413,8 @@
             return '暂无事项，添加一个吧！'
           case 'all':
             return '还没有任何待办事项'
+          case 'search':
+            return searchText.value ? '没有找到匹配的事项' : '请输入搜索内容'
           default:
             return '暂无事项'
         }
@@ -420,21 +460,34 @@
       const selectTag = (tag) => {
         const displayText = tag.displayText || `#${tag.name}#`
         
-        // 如果输入框为空，直接设置文本
-        if (!newTodoText.value.trim()) {
-          newTodoText.value = displayText
+        // 根据当前激活的tab选择输入框
+        if (activeTab.value === 'search') {
+          // 搜索模式
+          if (!searchText.value.trim()) {
+            searchText.value = displayText
+          } else {
+            searchText.value = searchText.value.trim() + ' ' + displayText
+          }
+          
+          // 聚焦到搜索框
+          if (searchInputRef.value) {
+            searchInputRef.value.focus()
+          }
         } else {
-          // 如果输入框已有内容，在末尾添加tag
-          newTodoText.value = newTodoText.value.trim() + ' ' + displayText
+          // 添加事项模式
+          if (!newTodoText.value.trim()) {
+            newTodoText.value = displayText
+          } else {
+            newTodoText.value = newTodoText.value.trim() + ' ' + displayText
+          }
+          
+          // 聚焦到输入框
+          if (todoInputRef.value) {
+            todoInputRef.value.focus()
+          }
         }
-        
         // 隐藏下拉列表
         hideTagDropdown()
-        
-        // 聚焦到输入框
-        if (todoInputRef.value) {
-          todoInputRef.value.focus()
-        }
       }
 
       // 添加待办事项
@@ -445,6 +498,22 @@
           hideTagDropdown()
         }
       }
+      // 监听搜索文本变化，实时搜索
+      watch(searchText, (newValue) => {
+        if (newValue.trim() && activeTab.value === 'search') {
+          performSearch()
+        } else if (!newValue.trim() && activeTab.value === 'search') {
+          searchResults.value = []
+        }
+      })
+
+      // 监听tab切换，清空搜索状态
+      watch(activeTab, (newTab) => {
+        if (newTab !== 'search') {
+          searchText.value = ''
+          searchResults.value = []
+        }
+      })
 
       // 工具函数
       const formatDate = (date) => {
@@ -481,18 +550,20 @@
 
       return {
         newTodoText,
+        searchText,
         activeTab,
         filteredTodos,
         emptyMessage,
         currentTodos,
         selectedDateDisplay,
-        addTodo,
         userInfo,
         editUserInfo,
         showEditDialog,
         showDropdown,
         avatarInput,
         backgroundInput,
+        addTodo,
+        performSearch,
         toggleDropdown,
         openEditDialog,
         logout,
@@ -506,6 +577,7 @@
         showTagDropdown,
         tagDropdownRef,
         todoInputRef,
+        searchInputRef,
         showTagDropdownHandler,
         hideTagDropdown,
         selectTag
