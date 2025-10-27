@@ -5,6 +5,8 @@
         <button class="nav-btn" @click="prevMonth">&#10094;</button>
         <div class="month-year">{{ displayMonthYear }}</div>
         <button class="nav-btn" @click="nextMonth">&#10095;</button>
+        <!-- 添加统计按钮 -->
+        <button class="nav-btn stats-btn" @click="$emit('open-stats')">❤</button>
         <button class="nav-btn settings-btn" @click="$emit('open-settings')">🌙</button>
       </div>
       
@@ -74,7 +76,7 @@ export default {
     moodRecords: Object,
     dayRatings: Object
   },
-  emits: ['date-select', 'month-change', 'period-mark', 'open-settings','mood-click'],
+  emits: ['date-select', 'month-change', 'period-mark', 'open-settings','mood-click','open-stats'],
   setup(props, { emit }) {
     const weekdays = ['日', '一', '二', '三', '四', '五', '六']
     const monthNames = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
@@ -526,8 +528,9 @@ export default {
   background: rgba(255, 255, 255, 0.3);
 }
 
+
 .settings-btn {
-  margin-left: 10px;
+  margin-left: 5px;
   font-size: 1.3rem;
 }
 

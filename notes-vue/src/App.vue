@@ -33,6 +33,7 @@
                 @month-change="changeMonth"
                 @period-mark="openPeriodModal"
                 @mood-click="openMoodPopup"
+                @open-stats="openStatsPopup"
                 @open-settings="openPeriodSettings" />
 
       <!-- 弹窗组件 -->
@@ -53,6 +54,14 @@
         @add-event="handleAddEvent"
         @mark-period="handleMarkPeriod"
       />
+      <!-- ↓↓↓ 在这里添加统计弹窗 ↓↓↓ -->
+      <StatsPopup 
+        :visible="showStatsPopup"
+        :selectedDate="selectedDate"
+        :moodData="moodRecordsArray"
+        @close="closeStatsPopup"
+      />
+      <!-- ↑↑↑ 添加到这里结束 ↑↑↑ -->
 
       <PeriodSettings v-if="showPeriodSettings"
                       :settings="periodSettings"
@@ -78,6 +87,7 @@
   import LoginModal from './components/LoginModal.vue'
   import TemplateModal from './components/TemplateModal.vue'
   import MoodPopup from './components/MoodPopup.vue'
+  import StatsPopup from './components/StatsPopup.vue'  // 添加这行
 
   export default {
     name: 'App',
@@ -88,7 +98,8 @@
       PeriodSettings,
       LoginModal,
       TemplateModal,
-      MoodPopup  // 新增心情弹窗组件
+      MoodPopup,  // 新增心情弹窗组件
+      StatsPopup //心情统计
     },
     setup() {
       const isLoggedIn = ref(false)
@@ -430,6 +441,36 @@
         loadBackgroundFromStorage()
       })
 
+      // ========== 添加统计弹窗状态 ==========
+      const showStatsPopup = ref(false)
+      
+      // 打开统计弹窗
+      const openStatsPopup = () => {
+        showStatsPopup.value = true
+      }
+      
+      // 关闭统计弹窗
+      const closeStatsPopup = () => {
+        showStatsPopup.value = false
+      }
+      
+      // 转换心情数据格式
+      const moodRecordsArray = computed(() => {
+        if (!moodRecords.value) return []
+        
+        return Object.entries(moodRecords.value).map(([dateStr, moodData]) => {
+          const [year, month, day] = dateStr.split('-').map(Number)
+          return {
+            date: new Date(year, month - 1, day),
+            mood: moodData.mood,
+            note: moodData.note,
+            emoji: moodData.emoji,
+            timestamp: moodData.timestamp
+          }
+        })
+      })
+      // ========== 添加结束 ==========
+
     return {
       currentDate,
       selectedDate,
@@ -478,7 +519,12 @@
       openTemplateModal,
       closeTemplateModal,
       saveTemplate,
-      deleteTemplate
+      deleteTemplate,
+      // 添加统计相关的返回项
+      showStatsPopup,
+      openStatsPopup,
+      closeStatsPopup,
+      moodRecordsArray,
     }
   }
 }
