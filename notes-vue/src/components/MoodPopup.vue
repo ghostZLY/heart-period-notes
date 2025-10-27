@@ -33,7 +33,11 @@
           ></textarea>
         </div>
         
-        <button @click="saveMood" class="save-btn">保存心情记录</button>
+        <!-- 修改按钮区域，添加重置按钮 -->
+        <div class="button-group">
+          <button @click="resetForm" class="reset-btn">重置</button>
+          <button @click="saveMood" class="save-btn">保存心情记录</button>
+        </div>
       </div>
     </div>
   </div>
@@ -58,7 +62,7 @@ export default {
       default:null
     }
   },
-  emits: ['close', 'save-mood'],  // 移除了不需要的 emit 事件
+  emits: ['close', 'save-mood'],
   setup(props, { emit }) {
     const note = ref('')
     const selectedMood = ref('')
@@ -143,6 +147,7 @@ export default {
       close,
       selectMood,
       saveMood,
+      resetForm,
       formatDate
     }
   }
@@ -289,8 +294,14 @@ export default {
   font-size: 14px;
 }
 
+/* 新增按钮组样式 */
+.button-group {
+  display: flex;
+  gap: 12px;
+}
+
 .save-btn {
-  width: 100%;
+  flex: 2;
   padding: 12px;
   background: #007bff;
   color: white;
@@ -308,5 +319,21 @@ export default {
 .save-btn:disabled {
   background: #ccc;
   cursor: not-allowed;
+}
+
+.reset-btn {
+  flex: 1;
+  padding: 12px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.reset-btn:hover {
+  background: #545b62;
 }
 </style>
