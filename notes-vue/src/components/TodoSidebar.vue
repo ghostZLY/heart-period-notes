@@ -1046,6 +1046,8 @@ import { computed, ref, onMounted, watch } from 'vue'
   .todo-list {
     flex: 1;
     overflow-y: auto;
+    max-height: calc(100vh - 300px);
+    min-height: 0;
   }
 
   .todo-item {
@@ -1106,6 +1108,8 @@ import { computed, ref, onMounted, watch } from 'vue'
     flex: 1;
     overflow-y: auto;
     margin-bottom: 20px;
+    max-height: calc(100vh - 300px);
+    min-height: 0;
   }
 
   .template-item {
