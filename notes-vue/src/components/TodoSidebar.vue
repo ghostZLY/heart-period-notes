@@ -24,6 +24,14 @@
 
       <h2>记事本</h2>
       <div class="selected-date">{{ selectedDateDisplay }}</div>
+
+      <!-- 统计按钮 -->
+      <div class="stats-button" @click="openStatsDialog">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 3v18h18"></path>
+          <path d="M7 16l4-4 4 4 6-6"></path>
+        </svg>
+      </div>
     </div>
 
     <!-- 个人信息编辑对话框 -->
@@ -109,6 +117,35 @@
       </div>
     </div>
 
+    <!-- 统计对话框 -->
+    <div v-if="showStatsDialog" class="stats-dialog-overlay" @click="showStatsDialog = false">
+      <div class="stats-dialog" @click.stop>
+        <h3>事项统计</h3>
+        <div class="stats-content">
+          <div v-if="hasTagData" class="chart-container">
+            <canvas ref="chartCanvas"></canvas>
+          </div>
+          <div v-else class="no-data">
+            <p>暂无tag数据</p>
+            <p class="hint">请先创建tag并添加相关事项</p>
+          </div>
+          <div class="stats-summary">
+            <div class="summary-item">
+              <span class="label">总事项数:</span>
+              <span class="value">{{ totalTodosCount }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="label">已标记事项:</span>
+              <span class="value">{{ taggedTodosCount }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button @click="showStatsDialog = false" class="cancel-btn">关闭</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Tab栏 -->
     <div class="tab-container">
       <button class="tab-button"
@@ -131,7 +168,7 @@
               @click="activeTab = 'templates'">
         tag管理
       </button>
-    
+
     </div>
 
     <div class="todo-content">
@@ -139,26 +176,26 @@
       <div v-if="activeTab !== 'templates'">
         <div class="todo-input-section">
           <div class="input-with-dropdown">
-          <!-- 今日事项和所有事项的输入框 -->
-          <input v-if="activeTab !== 'search'"
-                type="text"
-                ref="todoInputRef"
-                v-model="newTodoText"
-                @focus="showTagDropdownHandler"
-                @blur="hideTagDropdown"
-                @keyup.enter="addTodo"
-                placeholder="添加新事项...">
+            <!-- 今日事项和所有事项的输入框 -->
+            <input v-if="activeTab !== 'search'"
+                   type="text"
+                   ref="todoInputRef"
+                   v-model="newTodoText"
+                   @focus="showTagDropdownHandler"
+                   @blur="hideTagDropdown"
+                   @keyup.enter="addTodo"
+                   placeholder="添加新事项...">
             <!-- 搜索事项的输入框 -->
             <input v-else
-                  type="text"
-                  ref="searchInputRef"
-                  v-model="searchText"
-                  @focus="showTagDropdownHandler"
-                  @blur="hideTagDropdown"
-                  @keyup.enter="performSearch"
-                  placeholder="搜索事项...">
+                   type="text"
+                   ref="searchInputRef"
+                   v-model="searchText"
+                   @focus="showTagDropdownHandler"
+                   @blur="hideTagDropdown"
+                   @keyup.enter="performSearch"
+                   placeholder="搜索事项...">
             <!-- Tag下拉列表 -->
-            <div v-if="showTagDropdown && templateTags.length > 0" 
+            <div v-if="showTagDropdown && templateTags.length > 0"
                  class="tag-dropdown"
                  ref="tagDropdownRef">
               <div class="tag-dropdown-list">
@@ -196,15 +233,11 @@
       <!-- 模板管理模式 -->
       <div v-else class="template-mode">
         <div class="template-list">
-          <div
-            v-for="template in templateTags"
-            :key="template.id"
-            class="template-item"
-          >
-            <div
-              class="template-tag"
-              :style="{ backgroundColor: template.color }"
-            >
+          <div v-for="template in templateTags"
+               :key="template.id"
+               class="template-item">
+            <div class="template-tag"
+                 :style="{ backgroundColor: template.color }">
               {{ template.displayText }}
             </div>
             <div class="template-actions">
@@ -231,7 +264,7 @@
 </template>
 
 <script>
-import { computed, ref, onMounted, watch } from 'vue'
+  import { computed, ref, onMounted, watch, nextTick } from 'vue'
 
   export default {
     name: 'TodoSidebar',
@@ -255,6 +288,11 @@ import { computed, ref, onMounted, watch } from 'vue'
       // 搜索相关状态
       const searchResults = ref([])
 
+      // 统计相关状态
+      const showStatsDialog = ref(false)
+      const chartCanvas = ref(null)
+      let chartInstance = null
+
       // 用户信息
       const userInfo = ref({
         nickname: '',
@@ -276,6 +314,39 @@ import { computed, ref, onMounted, watch } from 'vue'
       const tagDropdownRef = ref(null)
       const todoInputRef = ref(null)
       const searchInputRef = ref(null)
+
+      // 统计相关计算属性
+      const tagStatistics = computed(() => {
+        const stats = {}
+        const allTodos = Object.values(props.todos).flat()
+
+        props.templateTags.forEach(tag => {
+          const tagText = tag.displayText || `#${tag.name}#`
+          const count = allTodos.filter(todo =>
+            todo.text.includes(tagText)
+          ).length
+          stats[tag.id] = {
+            tag,
+            count,
+            text: tagText
+          }
+        })
+
+        return stats
+      })
+
+      const hasTagData = computed(() => {
+        return Object.values(tagStatistics.value).some(stat => stat.count > 0)
+      })
+
+      const totalTodosCount = computed(() => {
+        return Object.values(props.todos).flat().length
+      })
+
+      const taggedTodosCount = computed(() => {
+        return Object.values(tagStatistics.value).reduce((sum, stat) => sum + stat.count, 0)
+      })
+
       // 从本地存储加载用户信息
       const loadUserInfo = () => {
         const saved = localStorage.getItem('userInfo')
@@ -320,6 +391,81 @@ import { computed, ref, onMounted, watch } from 'vue'
         editUserInfo.value = { ...userInfo.value }
         showEditDialog.value = true
         showDropdown.value = false
+      }
+
+      // 打开统计对话框
+      const openStatsDialog = async () => {
+        showStatsDialog.value = true
+        await nextTick()
+        if (hasTagData.value) {
+          renderChart()
+        }
+      }
+
+      // 渲染饼状图
+      const renderChart = () => {
+        if (!chartCanvas.value) return
+
+        // 销毁之前的图表实例
+        if (chartInstance) {
+          chartInstance.destroy()
+        }
+
+        // 准备图表数据
+        const chartData = Object.values(tagStatistics.value)
+          .filter(stat => stat.count > 0)
+          .map(stat => ({
+            label: stat.tag.name,
+            count: stat.count,
+            color: stat.tag.color
+          }))
+
+        if (chartData.length === 0) return
+
+        // 动态导入Chart.js
+        import('chart.js/auto').then(({ default: Chart }) => {
+          const ctx = chartCanvas.value.getContext('2d')
+
+          chartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: {
+              labels: chartData.map(item => item.label),
+              datasets: [{
+                data: chartData.map(item => item.count),
+                backgroundColor: chartData.map(item => item.color),
+                borderColor: '#fff',
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'right',
+                  labels: {
+                    usePointStyle: true,
+                    padding: 20,
+                    font: {
+                      size: 12
+                    }
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function (context) {
+                      const label = context.label || '';
+                      const value = context.raw || 0;
+                      const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                      const percentage = Math.round((value / total) * 100);
+                      return `${label}: ${value} (${percentage}%)`;
+                    }
+                  }
+                }
+              }
+            }
+          })
+        })
       }
 
       // 退出登录
@@ -382,7 +528,7 @@ import { computed, ref, onMounted, watch } from 'vue'
 
         const searchTerm = searchText.value.toLowerCase().trim()
         const allTodos = Object.values(props.todos).flat()
-        
+
         searchResults.value = allTodos.filter(todo => {
           // 搜索事项文本和tag内容
           return todo.text.toLowerCase().includes(searchTerm)
@@ -459,7 +605,7 @@ import { computed, ref, onMounted, watch } from 'vue'
       // 选择tag
       const selectTag = (tag) => {
         const displayText = tag.displayText || `#${tag.name}#`
-        
+
         // 根据当前激活的tab选择输入框
         if (activeTab.value === 'search') {
           // 搜索模式
@@ -468,7 +614,7 @@ import { computed, ref, onMounted, watch } from 'vue'
           } else {
             searchText.value = searchText.value.trim() + ' ' + displayText
           }
-          
+
           // 聚焦到搜索框
           if (searchInputRef.value) {
             searchInputRef.value.focus()
@@ -480,7 +626,7 @@ import { computed, ref, onMounted, watch } from 'vue'
           } else {
             newTodoText.value = newTodoText.value.trim() + ' ' + displayText
           }
-          
+
           // 聚焦到输入框
           if (todoInputRef.value) {
             todoInputRef.value.focus()
@@ -498,6 +644,7 @@ import { computed, ref, onMounted, watch } from 'vue'
           hideTagDropdown()
         }
       }
+
       // 监听搜索文本变化，实时搜索
       watch(searchText, (newValue) => {
         if (newValue.trim() && activeTab.value === 'search') {
@@ -514,6 +661,24 @@ import { computed, ref, onMounted, watch } from 'vue'
           searchResults.value = []
         }
       })
+
+      // 监听todos变化，更新图表
+      watch(() => props.todos, () => {
+        if (showStatsDialog.value && hasTagData.value) {
+          nextTick(() => {
+            renderChart()
+          })
+        }
+      }, { deep: true })
+
+      // 监听templateTags变化，更新图表
+      watch(() => props.templateTags, () => {
+        if (showStatsDialog.value && hasTagData.value) {
+          nextTick(() => {
+            renderChart()
+          })
+        }
+      }, { deep: true })
 
       // 工具函数
       const formatDate = (date) => {
@@ -562,10 +727,17 @@ import { computed, ref, onMounted, watch } from 'vue'
         showDropdown,
         avatarInput,
         backgroundInput,
+        showStatsDialog,
+        chartCanvas,
+        tagStatistics,
+        hasTagData,
+        totalTodosCount,
+        taggedTodosCount,
         addTodo,
         performSearch,
         toggleDropdown,
         openEditDialog,
+        openStatsDialog,
         logout,
         saveUserInfo,
         triggerAvatarUpload,
@@ -615,6 +787,113 @@ import { computed, ref, onMounted, watch } from 'vue'
     opacity: 0.9;
     text-align: center;
   }
+
+  /* 统计按钮样式 */
+  .stats-button {
+    position: absolute;
+    top: 15px;
+    right: 25px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: white;
+  }
+
+    .stats-button:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(1.1);
+    }
+
+  /* 统计对话框样式 */
+  .stats-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .stats-dialog {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+  }
+
+    .stats-dialog h3 {
+      margin-bottom: 20px;
+      text-align: center;
+      color: #333;
+      font-size: 1.5rem;
+    }
+
+  .stats-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .chart-container {
+    height: 300px;
+    position: relative;
+    margin-bottom: 20px;
+  }
+
+  .no-data {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6c757d;
+  }
+
+    .no-data .hint {
+      font-size: 0.9rem;
+      margin-top: 10px;
+      opacity: 0.7;
+    }
+
+  .stats-summary {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin-top: 10px;
+  }
+
+  .summary-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+    .summary-item .label {
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+
+    .summary-item .value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #e46f89;
+    }
 
   /* 用户信息样式 */
   .user-info {
@@ -1148,18 +1427,18 @@ import { computed, ref, onMounted, watch } from 'vue'
     color: #333 !important;
   }
 
-  .edit-btn:hover {
-    background: #8cdbb9 !important;
-  }
+    .edit-btn:hover {
+      background: #8cdbb9 !important;
+    }
 
   .delete-btn {
     background: #ffd3b6 !important;
     color: #333 !important;
   }
 
-  .delete-btn:hover {
-    background: #ffc4a1 !important;
-  }
+    .delete-btn:hover {
+      background: #ffc4a1 !important;
+    }
 
   .empty-templates {
     text-align: center;
@@ -1179,9 +1458,9 @@ import { computed, ref, onMounted, watch } from 'vue'
     color: white !important;
   }
 
-  .new-template-btn:hover {
-    background: #ff8b84 !important;
-  }
+    .new-template-btn:hover {
+      background: #ff8b84 !important;
+    }
 
   /* Tag下拉列表样式 */
   .tag-dropdown {
@@ -1211,13 +1490,13 @@ import { computed, ref, onMounted, watch } from 'vue'
     margin-bottom: 4px;
   }
 
-  .tag-dropdown-item:hover {
-    background-color: #f8f9fa;
-  }
+    .tag-dropdown-item:hover {
+      background-color: #f8f9fa;
+    }
 
-  .tag-dropdown-item:last-child {
-    margin-bottom: 0;
-  }
+    .tag-dropdown-item:last-child {
+      margin-bottom: 0;
+    }
 
   .tag-preview {
     padding: 6px 12px;
