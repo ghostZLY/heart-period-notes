@@ -168,7 +168,6 @@
               @click="activeTab = 'templates'">
         tag管理
       </button>
-
     </div>
 
     <div class="todo-content">
@@ -349,11 +348,15 @@
 
       // 从本地存储加载用户信息
       const loadUserInfo = () => {
-        const saved = localStorage.getItem('userInfo')
+        const currentUser = localStorage.getItem('currentUser')
+        if (!currentUser) return
+        
+        const userDataKey = `userInfo_${currentUser}`
+        const saved = localStorage.getItem(userDataKey)
         if (saved) {
           const userData = JSON.parse(saved)
           userInfo.value = {
-            nickname: userData.nickname || '',
+            nickname: userData.nickname || currentUser,
             avatar: userData.avatar || '',
             background: userData.background || '',
             backgroundOpacity: userData.backgroundOpacity || 0.3
@@ -365,8 +368,12 @@
 
       // 保存用户信息到本地存储
       const saveUserInfo = () => {
+        const currentUser = localStorage.getItem('currentUser')
+        if (!currentUser) return
+        
         userInfo.value = { ...editUserInfo.value }
-        localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
+        const userDataKey = `userInfo_${currentUser}`
+        localStorage.setItem(userDataKey, JSON.stringify(userInfo.value))
         showEditDialog.value = false
         // 通知父组件背景变化
         emitBackgroundChange()
@@ -745,14 +752,15 @@
         triggerBackgroundUpload,
         handleBackgroundUpload,
         removeBackground,
-        // 新增的tag相关函数和引用
         showTagDropdown,
         tagDropdownRef,
         todoInputRef,
         searchInputRef,
         showTagDropdownHandler,
         hideTagDropdown,
-        selectTag
+        selectTag,
+        loadUserInfo,
+        emitBackgroundChange
       }
     }
   }

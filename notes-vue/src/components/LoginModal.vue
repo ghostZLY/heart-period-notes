@@ -49,6 +49,42 @@
         password: ''
       })
 
+      // 初始化用户数据
+      const initializeUserData = (username) => {
+        const userDataKey = `userInfo_${username}`
+        const periodSettingsKey = `periodSettings_${username}`
+        const moodRecordsKey = `moodRecords_${username}`
+        const templateTagsKey = `templateTags_${username}`
+        // 初始化用户个人信息
+        if (!localStorage.getItem(userDataKey)) {
+          const defaultUserInfo = {
+            nickname: username,
+            avatar: '',
+            background: '',
+            backgroundOpacity: 0.3
+          }
+          localStorage.setItem(userDataKey, JSON.stringify(defaultUserInfo))
+        }
+        
+        // 初始化生理期设置
+        if (!localStorage.getItem(periodSettingsKey)) {
+          const defaultSettings = {
+            duration: 6,
+            interval: 28
+          }
+          localStorage.setItem(periodSettingsKey, JSON.stringify(defaultSettings))
+        }
+        // 初始化模板标签
+        if (!localStorage.getItem(templateTagsKey)) {
+          localStorage.setItem(templateTagsKey, JSON.stringify([]))
+        }
+        // 初始化心情记录
+        if (!localStorage.getItem(moodRecordsKey)) {
+          localStorage.setItem(moodRecordsKey, JSON.stringify({}))
+        }
+      }
+
+
       // 切换登录/注册模式
       const toggleMode = () => {
         isLoginMode.value = !isLoginMode.value
@@ -68,6 +104,8 @@
           const users = JSON.parse(localStorage.getItem('users') || '{}')
           if (users[form.username] && users[form.username] === form.password) {
             localStorage.setItem('currentUser', form.username)
+            // 初始化用户数据（如果不存在）
+            initializeUserData(form.username)
             emit('login-success')
           } else {
             alert('账号或密码错误')
@@ -81,6 +119,8 @@
             users[form.username] = form.password
             localStorage.setItem('users', JSON.stringify(users))
             localStorage.setItem('currentUser', form.username)
+            // 初始化新用户数据
+            initializeUserData(form.username)
             alert('注册成功！')
             emit('login-success')
           }
@@ -91,7 +131,8 @@
         isLoginMode,
         form,
         toggleMode,
-        handleSubmit
+        handleSubmit,
+        initializeUserData
       }
     }
   }

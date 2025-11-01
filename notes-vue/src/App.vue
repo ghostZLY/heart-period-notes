@@ -101,7 +101,8 @@
       MoodPopup,  // 新增心情弹窗组件
       StatsPopup //心情统计
     },
-    setup() {
+  setup() {
+      const currentUsername = ref('')
       const isLoggedIn = ref(false)
       const currentDate = ref(new Date())
       const selectedDate = ref(new Date())
@@ -118,23 +119,68 @@
         opacity: 0.3
       })
 
-    // 从本地存储加载数据
-    const todos = ref(JSON.parse(localStorage.getItem('todos')) || {})
-    const periodDates = ref(JSON.parse(localStorage.getItem('periodDates')) || [])
-    const periodSettings = ref(JSON.parse(localStorage.getItem('periodSettings')) || {
-      duration: 6,
-      interval: 28
-    })
-    
-    const templateTags = ref(JSON.parse(localStorage.getItem('templateTags')) || [])
-    const showTemplateModal = ref(false)
-    const editingTemplate = ref(null)
-    const dayRatings = ref(JSON.parse(localStorage.getItem('dayRatings')) || {})
-    // 计算属性 - 统一使用字符串格式
-    const currentDateStr = computed(() => formatDate(selectedDate.value))
-    const currentDateRatings = computed(() => dayRatings.value[currentDateStr.value] || null)
-    const isPeriodDate = computed(() => periodDates.value.includes(currentDateStr.value))
+         // 数据状态 - 初始化为空，在登录后加载
+      const todos = ref({})
+      const periodDates = ref([])
+      const periodSettings = ref({
+        duration: 6,
+        interval: 28
+      })
+      const templateTags = ref([])
+      const showTemplateModal = ref(false)
+      const editingTemplate = ref(null)
+      const dayRatings = ref({})
+      const moodRecords = ref({})
+      //统计弹窗状态
+      const showStatsPopup = ref(false)
+      const getUserDataKey = (baseKey) => {
+        return currentUsername.value ? `${baseKey}_${currentUsername.value}` : baseKey
+      }
+      // 从本地存储加载用户数据
+      const loadUserData = () => {
+        if (!currentUsername.value) return
+        
+        const todosData = localStorage.getItem(getUserDataKey('todos'))
+        const periodDatesData = localStorage.getItem(getUserDataKey('periodDates'))
+        const periodSettingsData = localStorage.getItem(getUserDataKey('periodSettings'))
+        const dayRatingsData = localStorage.getItem(getUserDataKey('dayRatings'))
+        const templateTagsData = localStorage.getItem(getUserDataKey('templateTags'))
+        const moodRecordsData = localStorage.getItem(getUserDataKey('moodRecords'))
+        
+        todos.value = todosData ? JSON.parse(todosData) : {}
+        periodDates.value = periodDatesData ? JSON.parse(periodDatesData) : []
+        periodSettings.value = periodSettingsData ? JSON.parse(periodSettingsData) : {
+          duration: 6,
+          interval: 28
+        }
+        dayRatings.value = dayRatingsData ? JSON.parse(dayRatingsData) : {}
+        templateTags.value = templateTagsData ? JSON.parse(templateTagsData) : []
+        moodRecords.value = moodRecordsData ? JSON.parse(moodRecordsData) : {}
+        
+        // 加载背景设置
+        loadBackgroundFromStorage()
+      }
 
+    
+      // 计算属性 - 统一使用字符串格式
+      const currentDateStr = computed(() => formatDate(selectedDate.value))
+      const currentDateRatings = computed(() => dayRatings.value[currentDateStr.value] || null)
+      const isPeriodDate = computed(() => periodDates.value.includes(currentDateStr.value))
+      // 转换心情数据格式
+      const moodRecordsArray = computed(() => {
+        if (!moodRecords.value) return []
+        
+        return Object.entries(moodRecords.value).map(([dateStr, moodData]) => {
+          const [year, month, day] = dateStr.split('-').map(Number)
+          return {
+            date: new Date(year, month - 1, day),
+            mood: moodData.mood,
+            note: moodData.note,
+            emoji: moodData.emoji,
+            timestamp: moodData.timestamp
+          }
+        })
+      })
       // 计算样式 - 弹窗和下拉菜单不受背景透明度影响
       const backgroundStyle = computed(() => {
         if (!background.image) {
@@ -160,21 +206,44 @@
       // 检查登录状态
       const checkLoginStatus = () => {
         const currentUser = localStorage.getItem('currentUser')
-        isLoggedIn.value = !!currentUser
+        if (currentUser) {
+          isLoggedIn.value = true
+          currentUsername.value = currentUser
+          loadUserData()
+        } else {
+          isLoggedIn.value = false
+          currentUsername.value = ''
+        }
       }
 
       // 处理登录成功
       const handleLoginSuccess = () => {
-        isLoggedIn.value = true
-        // 登录后加载用户背景设置
-        loadBackgroundFromStorage()
+        const currentUser = localStorage.getItem('currentUser')
+        if (currentUser) {
+          isLoggedIn.value = true
+          currentUsername.value = currentUser
+          loadUserData() // 重新加载用户数据
+          // loadBackgroundFromStorage()
+        }
       }
 
       // 处理退出登录
       const handleLogout = () => {
         isLoggedIn.value = false
-        // 清除当前用户信息，但保留背景设置
+        currentUsername.value = ''
         localStorage.removeItem('currentUser')
+        // 重置数据状态
+        todos.value = {}
+        periodDates.value = []
+        dayRatings.value = {}
+        moodRecords.value = {}
+        templateTags.value = []
+        periodSettings.value = {
+          duration: 6,
+          interval: 28
+        }
+        background.image = ''
+        background.opacity = 0.3
       }
 
       // 处理背景变化
@@ -186,7 +255,10 @@
 
       // 从本地存储加载背景设置
       const loadBackgroundFromStorage = () => {
-        const saved = localStorage.getItem('userInfo')
+        if (!currentUsername.value) return
+        
+        const userDataKey = getUserDataKey('userInfo')
+        const saved = localStorage.getItem(userDataKey)
         if (saved) {
           const userData = JSON.parse(saved)
           background.image = userData.background || ''
@@ -196,16 +268,18 @@
 
       // 保存背景设置到本地存储
       const saveBackgroundToStorage = () => {
-        const saved = localStorage.getItem('userInfo')
+        if (!currentUsername.value) return
+        
+        const userDataKey = getUserDataKey('userInfo')
+        const saved = localStorage.getItem(userDataKey)
+        let userData = {}
         if (saved) {
-          const userData = JSON.parse(saved)
-          userData.background = background.image
-          userData.backgroundOpacity = background.opacity
-          localStorage.setItem('userInfo', JSON.stringify(userData))
+          userData = JSON.parse(saved)
         }
+        userData.background = background.image
+        userData.backgroundOpacity = background.opacity
+        localStorage.setItem(userDataKey, JSON.stringify(userData))
       }
-    // === 新增：心情数据存储 ===
-    const moodRecords = ref(JSON.parse(localStorage.getItem('moodRecords')) || {})
 
     // 选择日期
     const selectDate = (date) => {
@@ -307,11 +381,13 @@
     }
 
       // 保存生理期设置
-      const savePeriodSettings = (settings) => {
-        periodSettings.value = settings
-        localStorage.setItem('periodSettings', JSON.stringify(settings))
-        closePeriodSettings()
+    const savePeriodSettings = (settings) => {
+      periodSettings.value = settings
+      if (currentUsername.value) {
+        localStorage.setItem(getUserDataKey('periodSettings'), JSON.stringify(settings))
       }
+      closePeriodSettings()
+    }
 
       // 打开模板弹窗
       const openTemplateModal = (template = null) => {
@@ -358,7 +434,9 @@
 
       // 保存模板数据到本地存储
       const saveTemplateTags = () => {
-        localStorage.setItem('templateTags', JSON.stringify(templateTags.value))
+        if (currentUsername.value) {
+          localStorage.setItem(getUserDataKey('templateTags'), JSON.stringify(templateTags.value))
+        }
       }
 
       // === 心情弹窗相关方法 ===
@@ -388,8 +466,7 @@
           timestamp: new Date().toISOString()
         }
         // 实现保存心情逻辑，可以保存到 localStorage
-        localStorage.setItem('moodRecords', JSON.stringify(moodRecords.value))
-        // 例如：localStorage.setItem('moodRecords', JSON.stringify(moodData))
+        saveMoodRecords()
         // 关闭弹窗
         closeMoodPopup()
         console.log('心情已保存:', moodData)
@@ -410,22 +487,40 @@
       // 处理标记生理期
       const handleMarkPeriod = (date) => {
         console.log('标记生理期:', date)
-        // 实现标记生理期逻辑
+      }
+      // 打开统计弹窗
+      const openStatsPopup = () => {
+        showStatsPopup.value = true
+      }
+      
+      // 关闭统计弹窗
+      const closeStatsPopup = () => {
+        showStatsPopup.value = false
       }
 
       // 保存数据到本地存储
       const saveTodos = () => {
-        localStorage.setItem('todos', JSON.stringify(todos.value))
+        if (currentUsername.value) {
+          localStorage.setItem(getUserDataKey('todos'), JSON.stringify(todos.value))
+        }
       }
 
       const savePeriodDates = () => {
-        localStorage.setItem('periodDates', JSON.stringify(periodDates.value))
+        if (currentUsername.value) {
+          localStorage.setItem(getUserDataKey('periodDates'), JSON.stringify(periodDates.value))
+        }
       }
 
       const saveDayRatings = () => {
-        localStorage.setItem('dayRatings', JSON.stringify(dayRatings.value))
+        if (currentUsername.value) {
+          localStorage.setItem(getUserDataKey('dayRatings'), JSON.stringify(dayRatings.value))
+        }
       }
-
+      const saveMoodRecords = () => {
+        if (currentUsername.value) {
+          localStorage.setItem(getUserDataKey('moodRecords'), JSON.stringify(moodRecords.value))
+        }
+      }
 
     // 格式化日期
     const formatDate = (date) => {
@@ -438,38 +533,9 @@
         // 检查登录状态
         checkLoginStatus()
         // 加载背景设置
-        loadBackgroundFromStorage()
+        // loadBackgroundFromStorage()
       })
 
-      // ========== 添加统计弹窗状态 ==========
-      const showStatsPopup = ref(false)
-      
-      // 打开统计弹窗
-      const openStatsPopup = () => {
-        showStatsPopup.value = true
-      }
-      
-      // 关闭统计弹窗
-      const closeStatsPopup = () => {
-        showStatsPopup.value = false
-      }
-      
-      // 转换心情数据格式
-      const moodRecordsArray = computed(() => {
-        if (!moodRecords.value) return []
-        
-        return Object.entries(moodRecords.value).map(([dateStr, moodData]) => {
-          const [year, month, day] = dateStr.split('-').map(Number)
-          return {
-            date: new Date(year, month - 1, day),
-            mood: moodData.mood,
-            note: moodData.note,
-            emoji: moodData.emoji,
-            timestamp: moodData.timestamp
-          }
-        })
-      })
-      // ========== 添加结束 ==========
 
     return {
       currentDate,
@@ -494,6 +560,10 @@
       currentDateStr,
       currentDateRatings,
       isPeriodDate,
+      showStatsPopup,
+      moodRecordsArray,
+      currentUsername,
+      loadUserData,
       handleLoginSuccess,
       handleLogout,
       handleBackgroundChange,
@@ -520,11 +590,9 @@
       closeTemplateModal,
       saveTemplate,
       deleteTemplate,
-      // 添加统计相关的返回项
-      showStatsPopup,
       openStatsPopup,
       closeStatsPopup,
-      moodRecordsArray,
+      saveMoodRecords
     }
   }
 }
